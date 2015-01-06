@@ -1,17 +1,17 @@
-function [x, jb] = simplex(c, A, b, x)
+function [x, jb] = simplex(c, A, b, x, jb)
 %SIMPLEX  Simplex method.
+if nargin < 5
+    jb = find(x);
+end
 if A*x ~= b
     error('Вектор x не является допустимым планом.');
 end
-jb = find(x);
-m = length(jb);
-B = eye(m)/(A(:, jb));
+[m, n] = size(A);
+B = eye(m)/A(:, jb);
 for i = 1:100
-    jn = setdiff(1:length(A), jb);
-    % вектор потенциалов
-    u = c(jb)'*B;
-    % оценки
-    deltas = u*A(:, jn) - c(jn)';
+    jn = setdiff(1:n, jb);
+    u = c(jb)'*B; % вектор потенциалов
+    deltas = u*A(:, jn) - c(jn)'; % оценки
     if deltas >= 0
         % нашли решение
         return;
@@ -20,7 +20,9 @@ for i = 1:100
     j0 = min(jn(deltas < 0));
     z = B*A(:, j0);
     if all(z <= 0)
-        warning('Нет решения');
+        disp('Нет решения');
+        x = [];
+        jb = [];
         return;
     end
     % Шаг 4

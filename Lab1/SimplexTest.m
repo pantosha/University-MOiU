@@ -1,5 +1,32 @@
 classdef SimplexTest < matlab.unittest.TestCase
     methods (Test)
+        function testNoSolve(testCase)
+            c = [-2; 1; -1; 1; -3; 1; 2];
+            A = [0 1 3 -2 1 0 2;
+                1 1 2 -2 0 0 -1;
+                0 1 1 -2 0 1 4];
+            b  = [2; 0; 4];
+            x = [0; 0; 0; 0; 2; 4; 0];
+            jb = [4; 5; 6];
+            expSolution = [];
+            actSolution = simplex(c, A, b, x, jb);
+            testCase.verifyEqual(actSolution, expSolution, 'AbsTol', sqrt(eps));
+        end
+        
+        function testDegenerateBasis(testCase)
+            c = [-2; -1; -1; -1; -3; 1; 2];
+            A = [0 1 3 -2 1 0 2;
+                1 1 2 -2 0 0 -1;
+                0 1 1 -2 0 1 4];
+            b  = [2; 0; 4];
+            x = [0; 0; 0; 0; 2; 4; 0];
+            jb = [4; 5; 6];
+            options = optimset('Algorithm', 'simplex');
+            expSolution = linprog(-c, [], [], A, b, zeros(length(c), 1), [], [], options);
+            actSolution = simplex(c, A, b, x, jb);
+            testCase.verifyEqual(actSolution, expSolution, 'AbsTol', eps);
+        end
+        
         function testSimplex(testCase)
             c = [1; 1; 1; 1; 1];
             A = [1, 1, 0, 2, 0;
