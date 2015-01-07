@@ -3,7 +3,7 @@ function [x, jb] = simplex(c, A, b, x, jb)
 if nargin < 5
     jb = find(x);
 end
-if A*x ~= b
+if any(A*x ~= b)
     error('Вектор x не является допустимым планом.');
 end
 [m, n] = size(A);

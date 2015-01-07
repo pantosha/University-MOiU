@@ -42,8 +42,8 @@ classdef SimplexTest < matlab.unittest.TestCase
             b = [5; -9];
             A = [1, 4, 4, 1;
                 1, 7, 8, 2];
-            x = [1; 0; 1; 0];
-            expSolution = [1; 0; 0; 4];
+            x = [19; 0; -3.5; 0];
+            expSolution = [19; 0; 0; -14];
             actSolution = simplex(c, A, b, x);
             testCase.verifyEqual(actSolution, expSolution, 'AbsTol', sqrt(eps));
         end
