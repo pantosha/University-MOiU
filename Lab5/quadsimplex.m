@@ -15,178 +15,123 @@ end
 jz = jo;
 
 %check for correct start plan
-if ((A*x) ~= b)
-    disp('Не выполняются основные ограничения');
-    disp(A*x);
-end
-if (any(x < 0))
-    disp('Не выполняются прямые ограничения');
-    return;
-end
+assert(all((A*x) == b), 'Не выполняются основные ограничения');
+assert(all((x) >= 0), 'Не выполняются прямые ограничения');
 
-navigateToFourthStep = false;
-
+skipFirstPhase = false;
 while (true)
-    if (~navigateToFourthStep)
-        %1 находим потенциал и оценки
-        B = inv(A(:, jo));
+    if (~skipFirstPhase)
+        jnz = setdiff(1:n, jz);
+        
+        % Шаг 1
         cx = c + D*x;
-        uxTransp = -cx(jo)'*B;
-        delta = (uxTransp*A)' + cx;
+        u = -cx(jo)'/A(:, jo); % потенциалы
+        % TODO: считать deltas только jnz (deltas = (u*A(:, jnz))' + cx(jnz))
+        deltas = (u*A)' + cx; % оценки
         
-        
-        Jnz = setdiff(1:n, jz);
-        %2 проверяем на оптимальность
-        if all(delta(Jnz) >= 0)
+        % Шаг 2. Проверка на оптимальность
+        if all(deltas(jnz) >= 0)
             fval = c'*x + 0.5*x'*D*x;
             return;
         end
         
-        %3 находим минимальный индекс отрицательного элемента из Jnz,
-        %индекс в Jnz
-        j0 = 0;
-        for i=1:length(Jnz)
-            if (delta(Jnz(i)) < 0)
-                j0 = Jnz(i);
-                break;
-            end
-        end
-        
+        % Шаг 3. Находим минимальный индекс отрицательного элемента из jnz,
+        % j0 - индекс в jnz
+        j0 = min(jnz(deltas(jnz) < 0));
     end
     
-    %4 формируем систему
-    % Dz*lz + Az'*y + Dzjo = 0
+    % Шаг 4. Формируем систему
+    % Dz*lz + Az'*y + Dzj0 = 0
     % Az*lz +Aj0 = 0
+    
+    %       /Dz | Az'\
+    % Hz = | -- + --- |
+    %       \Az | 0  /
     Dz = D(jz, jz);
     Az = A(:, jz);
+    Hz = [Dz, Az'; Az, zeros(m)];
+    
     Dzj0 = D(jz, j0);
     Aj0 = A(:, j0);
+    hj0 = [Dzj0; Aj0];
     
-    DAm = size(Dz, 1);
-    DAn = size(Dz, 2);
-    AAm = size(Az, 1);
-    AAn = size(Az, 2);
+    %                 /lz\
+    % -Hz^-1 * hj0 = | -- |
+    %                 \ y/
+    tmp = -Hz\hj0;
+    l = tmp(1:length(jz));
+    y = tmp(length(jz)+1:end);
     
-    %строим матрицу Hz
-    % Dz Az'
-    % Az 0
-    %use different dimensions because of transposed A matrix
-    Hz = zeros(DAm + AAm, DAn + AAm);
-    Hz(1:DAm, 1:DAm) = Dz;
-    Hz((DAm + 1):(DAm + AAm), 1:AAn) = Az;
-    Hz(1:AAn, (DAn + 1):(DAn + AAm)) = Az';
+    % gamma = l'Dl = Dzj0'*lz + Aj0'*y + dj0j0
+    gamma = Dzj0'*l + Aj0'*y + D(j0, j0);
     
-    %находим hj0
-    % Dzj0
-    % Aj0
-    hj0 = Dzj0;
-    hj0((size(Dzj0, 1) + 1):(size(Dzj0, 1) + size(Aj0, 1))) = Aj0;
+    lz = l < 0;
+    jlz = jz(lz);
+    [teta, iteta] = min(-x(jlz)./l(lz));
+    iteta = jlz(iteta);
     
-    % обратная матрица для H
-    Hinv = inv(Hz);
-    % -Hz^-1 * hj0 = lz
-    %                y
-    bufferDirectionResult = -Hinv*hj0;
-    lz = bufferDirectionResult(1:length(jz));
-    y = bufferDirectionResult((length(jz) + 1):length(bufferDirectionResult));
-    
-    % sigm = l'Dl = Dzj0'*lz + Aj0'*y + dj0j0
-    sigm = Dzj0'*lz + Aj0'*y + D(j0, j0);
-    
-    %5 находим шаг min teta для j = Jz
-    Teta0Index = 0;
-    Teta0 = inf;
-    for j=1:length(jz)
-        bufferTeta = 0;
-        if (lz(j) < 0)
-            bufferTeta = -x(jz(j))/lz(j);
-            if (bufferTeta < Teta0)
-                Teta0 = bufferTeta;
-                Teta0Index = jz(j);
-            end
-        end
+    newTeta = abs(deltas(j0)/gamma);
+    if newTeta < teta
+        teta = newTeta;
+        iteta = j0;
     end
     
-    if (sigm ~= 0)
-        bufferTeta = abs(delta(j0)/sigm);
-        if (bufferTeta < Teta0)
-            Teta0 = bufferTeta;
-            Teta0Index = j0;
-        end
-    end
-    
-    if (Teta0Index == 0)
+    if ~isfinite(teta)
         disp('Целевая функция неограничена снизу.');
         return;
     end
     
-    %6
-    newPlan = zeros(length(x), 1);
-    for j=1:length(newPlan)
-        if (any(jz == j))
-            newPlan(j) = x(j) + Teta0*lz(find(jz == j, 1));
-        else
-            if (j == j0)
-                newPlan(j) = x(j) + Teta0;
+    % Шаг 5. Постройка нового плана
+    xj0 = x(j0);
+    x(jnz) = 0;
+    x(jz) = x(jz) + teta.*l;
+    x(j0) = xj0 + teta;
+    
+    % Шаг 6.
+    if iteta == j0
+        %a
+        jz(end + 1) = j0;
+        skipFirstPhase = false;
+    elseif any(setdiff(jz, jo) == iteta)
+        %b
+        jz = setdiff(jz, iteta);
+        deltas(j0) = deltas(j0) + teta*gamma;
+        skipFirstPhase = true;
+    else
+        js = iteta;
+        asteriskWithoutSupport = setdiff(jz, jo);
+        
+        jPlus = 0;
+        for j=1:length(asteriskWithoutSupport)
+            es = zeros(length(jo), 1);
+            es(jo == js) = 1;
+            
+            bufferResultWithJPlus = es'/A(:, jo)*A(:, asteriskWithoutSupport(j));
+            
+            if (bufferResultWithJPlus ~= 0)
+                jPlus = asteriskWithoutSupport(j);
+                break;
             end
         end
-    end
-    x = newPlan;
-    
-    %7
-    %a
-    if (Teta0Index == j0)
-        jz(length(jz) + 1) = j0;
-        jz = sort(jz);
-        navigateToFourthStep = false;
-    else
-        %b
-        if (any(setdiff(jz, jo) == Teta0Index))
-            jz = setdiff(jz, Teta0Index);
-            jz = sort(jz);
-            delta(j0) = delta(j0) + Teta0*sigm;
+        
+        if jPlus ~= 0
+            %c
+            jo = setdiff(jo, iteta);
+            jo(end + 1) = jPlus;
             
-            navigateToFourthStep = true;
+            jz = setdiff(jz, iteta);
+            deltas(j0) = deltas(j0) + teta*gamma;
+            
+            skipFirstPhase = true;
         else
-            js = Teta0Index;
-            asteriskWithoutSupport = setdiff(jz, jo);
+            %d
+            jo = setdiff(jo, iteta);
+            jo(end + 1) = j0;
             
-            jPlus = 0;
-            for j=1:length(asteriskWithoutSupport)
-                es = zeros(length(jo), 1);
-                es(jo == js) = 1;
-                
-                bufferResultWithJPlus = es'*inv(A(:, jo))*A(:, asteriskWithoutSupport(j));
-                
-                if (bufferResultWithJPlus ~= 0)
-                    jPlus = asteriskWithoutSupport(j);
-                    break;
-                end
-            end
+            jz = setdiff(jz, iteta);
+            jz(end + 1) = j0;
             
-            if (jPlus ~= 0)
-                %c
-                jo = setdiff(jo, Teta0Index);
-                jo(length(jo) + 1) = jPlus;
-                jo = sort(jo);
-                
-                jz = setdiff(jz, Teta0Index);
-                
-                delta(j0) = delta(j0) + Teta0*sigm;
-                
-                navigateToFourthStep = true;
-            else
-                %d
-                jo = setdiff(jo, Teta0Index);
-                jo(length(jo) + 1) = j0;
-                jo = sort(jo);
-                
-                jz = setdiff(jz, Teta0Index);
-                jz(length(jz) + 1) = j0;
-                jz = sort(jz);
-                
-                navigateToFourthStep = false;
-            end
+            skipFirstPhase = false;
         end
     end
 end
