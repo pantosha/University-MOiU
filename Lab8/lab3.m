@@ -17,9 +17,9 @@ expX = [7 0 2 0 2];
 %         ];
 % x0 = [0 0 0 0 10];
 
-[actX, M, B] = resourceAllocation(table);
+[actX, m, B] = resourceAllocation(table);
 disp(B);
-disp(M);
+disp(m);
 disp(actX);
 
 %% Run tests
