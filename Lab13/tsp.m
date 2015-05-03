@@ -26,13 +26,13 @@ for count = 1:1000
     end
     
     U = [minCycle(1:end-1); minCycle(2:end)];
-    newTasks = ones(m, n, size(U, 1));
-    for i = 1:size(U, 1)
+    newTasks = ones(m, n, size(U, 2));
+    for i = 1:size(U, 2)
         newTasks(:, :, i) = D.*newTasks(:, :, i);
     end
     i = U(1, :);
     j = U(2, :);
-    k = 1:size(U, 1);
+    k = 1:size(U, 2);
     newTasks(sub2ind(size(newTasks), i, j, k)) = inf;
     tasks = cat(3, tasks, newTasks);
 end
@@ -49,7 +49,7 @@ while ~isempty(cycle)
         minLength = length(cycle);
     end
     U = [cycle(1:end-1); cycle(2:end)];
-    X(sub2ind(size(X), U(:, 1), U(:, 2))) = 0;
+    X(sub2ind(size(X), U(1, :), U(2, :))) = 0;
     cycle = findCycle(X);
     cycleCount = cycleCount + 1;
 end
