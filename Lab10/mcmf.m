@@ -13,6 +13,8 @@ if nargin < 5
         B = X > 0;
     end
 end
+E = logical(E);
+B = logical(B);
 
 % ѕодсчитать потенциалы базисных узлов
 [m, n] = size(C);
